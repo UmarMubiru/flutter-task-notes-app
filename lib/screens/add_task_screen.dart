@@ -15,6 +15,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   final _descriptionController = TextEditingController();
   String _selectedPriority = 'Low';
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
+  bool _isLoading = false;
 
   final List<String> _priorities = ['Low', 'Medium', 'High'];
 
@@ -27,17 +28,43 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
 
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
-      final task = TaskItem(
-        title: _titleController.text.trim(),
-        priority: _selectedPriority,
-        description: _descriptionController.text.trim(),
-        isCompleted: false,
-      );
+      setState(() {
+        _isLoading = true;
+      });
 
-      await _dbHelper.insertTask(task);
+      try {
+        final task = TaskItem(
+          title: _titleController.text.trim(),
+          priority: _selectedPriority,
+          description: _descriptionController.text.trim(),
+          isCompleted: false,
+        );
 
-      if (mounted) {
-        Navigator.pop(context, true); // Return true to indicate success
+        await _dbHelper.insertTask(task);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Task added successfully!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+          Navigator.pop(context, true); // Return true to indicate success
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error saving task: $e'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
       }
     }
   }
@@ -107,7 +134,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
 
             // Priority dropdown
             DropdownButtonFormField<String>(
-              value: _selectedPriority,
+              initialValue: _selectedPriority,
               decoration: InputDecoration(
                 labelText: 'Priority',
                 prefixIcon: Icon(
@@ -200,7 +227,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 ],
               ),
               child: ElevatedButton(
-                onPressed: _submitForm,
+                onPressed: _isLoading ? null : _submitForm,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16.0),
                   backgroundColor: Colors.transparent,
@@ -208,15 +235,25 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
+                  disabledBackgroundColor: Colors.grey,
                 ),
-                child: const Text(
-                  'Submit',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Text(
+                        'Submit',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
               ),
             ),
           ],

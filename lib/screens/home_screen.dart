@@ -39,10 +39,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadTasks() async {
-    final tasks = await _dbHelper.getAllTasks();
-    setState(() {
-      _tasks = tasks;
-    });
+    try {
+      final tasks = await _dbHelper.getAllTasks();
+      setState(() {
+        _tasks = tasks;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading tasks: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _deleteTask(int id) async {
@@ -126,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onChanged: (value) {
                   _saveThemePreference(value);
                 },
-                activeColor: const Color(0xFF6366F1),
+                activeThumbColor: const Color(0xFF6366F1),
               ),
             ),
             // Tasks ListView

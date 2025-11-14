@@ -1,54 +1,50 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
 import '../models/task_item.dart';
+
+// Import platform-specific implementations
+import 'database_mobile.dart' as mobile;
+import 'database_desktop.dart' as desktop;
+import 'database_web.dart' as web;
+import 'platform_detector.dart' as platform;
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
-  static Database? _database;
+  dynamic _database;
 
   DatabaseHelper._init();
 
-  Future<Database> get database async {
+  Future<dynamic> get database async {
     if (_database != null) return _database!;
     _database = await _initDB('tasks.db');
     return _database!;
   }
 
-  Future<Database> _initDB(String filePath) async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, filePath);
-
-    return await openDatabase(
-      path,
-      version: 1,
-      onCreate: _createDB,
-    );
-  }
-
-  Future<void> _createDB(Database db, int version) async {
-    const idType = 'INTEGER PRIMARY KEY AUTOINCREMENT';
-    const textType = 'TEXT NOT NULL';
-    const intType = 'INTEGER NOT NULL';
-
-    await db.execute('''
-      CREATE TABLE tasks (
-        id $idType,
-        title $textType,
-        priority $textType,
-        description $textType,
-        isCompleted $intType
-      )
-    ''');
+  Future<dynamic> _initDB(String filePath) async {
+    if (kIsWeb) {
+      // Web platform - use SharedPreferences-based storage
+      return await web.initWebDatabase();
+    } else if (platform.isDesktop()) {
+      // Desktop platform - use sqflite_common_ffi
+      return await desktop.initDesktopDatabase(filePath);
+    } else {
+      // Mobile platform (Android/iOS) - use regular sqflite
+      return await mobile.initMobileDatabase(filePath);
+    }
   }
 
   // Insert a new TaskItem
   Future<int> insertTask(TaskItem task) async {
     final db = await database;
-    return await db.insert(
-      'tasks',
-      task.toJson(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    if (kIsWeb) {
+      return await db.insert('tasks', task.toJson());
+    } else {
+      return await db.insert(
+        'tasks',
+        task.toJson(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
   }
 
   // Retrieve all TaskItems
@@ -85,7 +81,6 @@ class DatabaseHelper {
   // Close the database
   Future<void> close() async {
     final db = await database;
-    db.close();
+    await db.close();
   }
 }
-
